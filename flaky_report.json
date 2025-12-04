@@ -1,10 +1,28 @@
 {
-  "tests": {
-    "tests/test_flaky.py::test_flaky": {
-      "runs": ["passed", "failed", "passed"],
-      "is_flaky": true,
-      "pass_count": 2,
-      "fail_count": 1
+    "tests": {
+        "None::test_flaky": {
+            "runs": [
+                "passed",
+                "failed",
+                "failed",
+                "passed",
+                "passed"
+            ],
+            "is_flaky": true,
+            "pass_count": 3,
+            "fail_count": 2
+        },
+        "None::test_stable": {
+            "runs": [
+                "passed",
+                "passed",
+                "passed",
+                "passed",
+                "passed"
+            ],
+            "is_flaky": false,
+            "pass_count": 5,
+            "fail_count": 0
+        }
     }
-  }
 }
