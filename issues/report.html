@@ -2,87 +2,397 @@ import json
 import argparse
 from datetime import datetime
 
+
 def load_report(path):
-    """Carrega o JSON do relatório de testes."""
     with open(path, "r") as f:
         return json.load(f)
 
+
 def generate_html(report_path="flaky_report.json", out_path="report.html"):
-    """Gera o relatório HTML baseado no JSON."""
     data = load_report(report_path)
 
-    # Cabeçalho do HTML
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    html = """
-<!DOCTYPE html>
-<html>
+    # Calcular estatísticas
+    tests = data["tests"]
+    total_tests = len(tests)
+    flaky_count = sum(1 for t in tests.values() if t["is_flaky"])
+    stable_count = total_tests - flaky_count
+    
+    total_runs = sum(len(t["runs"]) for t in tests.values())
+    total_failures = sum(t["fail_count"] for t in tests.values())
+    overall_pass_rate = ((total_runs - total_failures) / total_runs * 100) if total_runs > 0 else 0
+
+    html = """<!DOCTYPE html>
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Relatório de Testes Flaky</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background: #eee; }
-        .flaky { background: #ffb3b3; }
-        .stable { background: #b3ffb3; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-card.total .stat-value { color: #667eea; }
+        .stat-card.flaky .stat-value { color: #e74c3c; }
+        .stat-card.stable .stat-value { color: #27ae60; }
+        .stat-card.pass-rate .stat-value { color: #f39c12; }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        th {
+            padding: 18px 15px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 16px 15px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        tbody tr {
+            transition: background 0.2s;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .test-name {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge.flaky {
+            background: #ffe5e5;
+            color: #e74c3c;
+        }
+
+        .badge.stable {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+
+        .percentage {
+            font-weight: 600;
+        }
+
+        .percentage.high { color: #e74c3c; }
+        .percentage.medium { color: #f39c12; }
+        .percentage.low { color: #27ae60; }
+
+        .runs-detail {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #7f8c8d;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .metric {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .metric.pass { color: #27ae60; }
+        .metric.fail { color: #e74c3c; }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #7f8c8d;
+            border-top: 1px solid #ecf0f1;
+        }
+
+        .legend {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.95em;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .legend-color.flaky { background: #ffe5e5; border: 2px solid #e74c3c; }
+        .legend-color.stable { background: #d5f4e6; border: 2px solid #27ae60; }
+
+        @media (max-width: 768px) {
+            .header h1 { font-size: 1.8em; }
+            .stats { grid-template-columns: 1fr; }
+            .content { padding: 20px; }
+            th, td { padding: 12px 8px; font-size: 0.85em; }
+        }
     </style>
 </head>
 <body>
-    <h1>Relatório de Testes Flaky</h1>
-    <p>Gerado em: __REPORT_TIMESTAMP__</p>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Relatório de Testes Flaky</h1>
+            <p>Gerado em: """ + datetime.now().strftime("%d/%m/%Y às %H:%M:%S") + """</p>
+        </div>
 
-    <table>
-        <tr>
-            <th>Teste</th>
-            <th>Passes</th>
-            <th>Fails</th>
-            <th>Runs</th>
-            <th>Porcentagem Falhas</th>
-            <th>Status</th>
-        </tr>
+        <div class="stats">
+            <div class="stat-card total">
+                <div class="stat-value">""" + str(total_tests) + """</div>
+                <div class="stat-label">Total de Testes</div>
+            </div>
+            <div class="stat-card flaky">
+                <div class="stat-value">""" + str(flaky_count) + """</div>
+                <div class="stat-label">Testes Flaky</div>
+            </div>
+            <div class="stat-card stable">
+                <div class="stat-value">""" + str(stable_count) + """</div>
+                <div class="stat-label">Testes Estáveis</div>
+            </div>
+            <div class="stat-card pass-rate">
+                <div class="stat-value">""" + f"{overall_pass_rate:.1f}%" + """</div>
+                <div class="stat-label">Taxa de Sucesso</div>
+            </div>
+        </div>
+
+        <div class="content">
+            <h2 class="section-title">📊 Detalhamento dos Testes</h2>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color flaky"></div>
+                    <span><strong>Flaky:</strong> Testes com resultados inconsistentes</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color stable"></div>
+                    <span><strong>Estável:</strong> Testes com resultados consistentes</span>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome do Teste</th>
+                            <th style="text-align: center;">Passes</th>
+                            <th style="text-align: center;">Fails</th>
+                            <th style="text-align: center;">Total Runs</th>
+                            <th style="text-align: center;">Taxa de Falha</th>
+                            <th style="text-align: center;">Status</th>
+                            <th>Execuções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
 """
 
-    # Loop para preencher a tabela com os testes
-    for test_name, info in data["tests"].items():
+    # Ordenar testes: flaky primeiro, depois por taxa de falha
+    sorted_tests = sorted(
+        tests.items(),
+        key=lambda x: (not x[1]["is_flaky"], x[1]["fail_count"] / (x[1]["pass_count"] + x[1]["fail_count"]) if (x[1]["pass_count"] + x[1]["fail_count"]) > 0 else 0),
+        reverse=True
+    )
+
+    for test_name, info in sorted_tests:
         passes = info["pass_count"]
         fails = info["fail_count"]
         total = passes + fails
+        runs = info["runs"]
+
         fail_rate = (fails / total) * 100 if total > 0 else 0
-        row_class = "flaky" if info["is_flaky"] else "stable"
+        is_flaky = info["is_flaky"]
+
+        # Determinar classe de porcentagem
+        if fail_rate > 50:
+            pct_class = "high"
+        elif fail_rate > 20:
+            pct_class = "medium"
+        else:
+            pct_class = "low"
+
+        status_badge = "flaky" if is_flaky else "stable"
+        status_text = "Flaky" if is_flaky else " Estável"
+
+        # Formatar runs para exibição
+        runs_display = str(runs)[:50] + "..." if len(str(runs)) > 50 else str(runs)
 
         html += f"""
-        <tr class="{row_class}">
-            <td>{test_name}</td>
-            <td>{passes}</td>
-            <td>{fails}</td>
-            <td>{info["runs"]}</td>
-            <td>{fail_rate:.1f}%</td>
-            <td>{"Flaky" if info["is_flaky"] else "Estável"}</td>
-        </tr>
+                        <tr>
+                            <td class="test-name">{test_name}</td>
+                            <td style="text-align: center;">
+                                <span class="metric pass">✓ {passes}</span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="metric fail">✗ {fails}</span>
+                            </td>
+                            <td style="text-align: center;"><strong>{total}</strong></td>
+                            <td style="text-align: center;">
+                                <span class="percentage {pct_class}">{fail_rate:.1f}%</span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="badge {status_badge}">{status_text}</span>
+                            </td>
+                            <td>
+                                <div class="runs-detail" title="{runs}">{runs_display}</div>
+                            </td>
+                        </tr>
 """
-    # Fechamento do HTML
+
     html += """
-    </table>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>🤖 Relatório gerado automaticamente pelo sistema de detecção de Flaky Tests</strong></p>
+            <p style="margin-top: 10px; font-size: 0.9em;">
+                Este relatório identifica testes com comportamento inconsistente que podem precisar de quarentena ou correção.
+            </p>
+        </div>
+    </div>
 </body>
 </html>
 """
 
-    # Insere timestamp real e grava o arquivo HTML
-    html = html.replace("__REPORT_TIMESTAMP__", timestamp)
-
-    # Grava o arquivo HTML
-    with open(out_path, "w") as f:
-        f.write(html)
+    with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
 
-    print(f"Relatório gerado em: {out_path}")
+    print(f" Relatório HTML gerado com sucesso: {out_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--report", default="flaky_report.json", help="Caminho do JSON de entrada")
-    parser.add_argument("--out", default="report.html", help="Caminho do HTML de saída")
+    parser = argparse.ArgumentParser(description="Gera relatório HTML a partir do flaky_report.json")
+    parser.add_argument("--report", default="flaky_report.json", help="Caminho do arquivo JSON de entrada")
+    parser.add_argument("--out", default="report.html", help="Caminho do arquivo HTML de saída")
     args = parser.parse_args()
 
     generate_html(args.report, args.out)
