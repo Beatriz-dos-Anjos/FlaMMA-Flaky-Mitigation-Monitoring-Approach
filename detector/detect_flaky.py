@@ -26,10 +26,13 @@ def parse_junit_xml(path: str) -> dict:
 
     for testcase in root.iter('testcase'):
         # Reconstrói o nome do teste
-        file = testcase.get('file')
+        classname = testcase.get('classname')
         name = testcase.get('name')
-        test_id = f"{file}::{name}"
-        
+
+        if classname:
+            test_id = f"{classname}::{name}"
+        else:
+            test_id = name        
         status = "passed"
         if testcase.find('failure') is not None or testcase.find('error') is not None:
             status = "failed"

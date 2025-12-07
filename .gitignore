@@ -1,4 +1,16 @@
-__pycache__/
-*.pyc
+# Ignorar virtualenvs e artefatos comuns
 .venv/
-flaky_report.json
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.egg-info/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.coverage
+dist/
+build/
+*.egg
+.DS_Store
