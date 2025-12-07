@@ -7,52 +7,73 @@ on:
         required: false
         default: 3
         type: number
-  
 
 jobs:
   flaky-detection:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout TARGET repo (repo que está chamando)
+      # 1 — Checkout do repositório que está chamando o workflow
+      - name: Checkout TARGET repo (repo chamador)
         uses: actions/checkout@v4
 
-      - name: Checkout FlaMMA tooling (seu repo)
+      # 2 — Quando for OUTRO repositório → clona o FlaMMA normalmente em .flamma/
+      - name: Checkout FlaMMA tooling (outro repo)
+        if: ${{ github.repository != 'Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach' }}
         uses: actions/checkout@v4
         with:
           repository: Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach
           path: .flamma
 
+      # 3 — Quando estiver testando NO PRÓPRIO repositório → copia local para .flamma/
+      - name: Use local FlaMMA (quando rodando no próprio repo)
+        if: ${{ github.repository == 'Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach' }}
+        run: |
+          mkdir -p .flamma
+          cp -R detector .flamma/
+          cp -R quarantine .flamma/
+          cp -R issues .flamma/
+          cp requirements.txt .flamma/
+
+      # 4 — Setup Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
+      # 5 — Instalar dependências
       - name: Install dependencies
         run: pip install -r .flamma/requirements.txt
 
+      # 6 — Gerar filtro de quarentena
       - name: Generate quarantine filter
         run: python .flamma/quarantine/quarantine.py generate-filter
 
+      # 7 — Rodar testes com filtro
       - name: Run tests with filter
         run: |
           pytest -k "$(cat filter.txt)" --junitxml=ci_results.xml
 
+      # 8 — Rodar o flaky detector (N reruns)
       - name: Run flaky detector
         run: python .flamma/detector/detect_flaky.py --reruns ${{ inputs.reruns }}
 
+      # 9 — Atualizar quarentena
       - name: Update quarantine list
         run: python .flamma/quarantine/quarantine.py update
 
+      # 10 — Criar issues (usa secrets herdados)
       - name: Create GitHub issues
         env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python .flamma/issues/create_github_issue.py --report flaky_report.json
 
+      # 11 — Gerar relatório HTML
       - name: Generate HTML report
         run: python .flamma/issues/generate_report.py
 
+      # 12 — Fazer upload dos artefatos
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
