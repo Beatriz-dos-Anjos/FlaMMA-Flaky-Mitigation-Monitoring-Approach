@@ -1,32 +1,21 @@
-import json
-from datetime import datetime
-import argparse
 
-def generate_html(report_path=".flamma/quarantine/flaky_tests.json", out_path="report.html", workflow_name=None):
-    with open(report_path, "r") as f:
-        data = json.load(f)
-
-    workflow_name = workflow_name or "Último workflow"
-    html = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>Flaky Test Report</title>
     <style>
-        body {{ font-family: Arial, sans-serif; padding: 20px; }}
-        h1, h2 {{ margin-bottom: 5px; }}
-        table {{ border-collapse: collapse; width: 100%; margin-top: 15px; }}
-        th, td {{ border: 1px solid #ccc; padding: 8px; text-align: left; }}
-        th {{ background: #eee; }}
-        .flaky {{ background: #ffb3b3; }}
-        .stable {{ background: #b3ffb3; }}
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #eee; }
+        .flaky { background: #ffb3b3; }
+        .stable { background: #b3ffb3; }
     </style>
 </head>
 <body>
     <h1>Relatório de Testes Flaky</h1>
-    <h2>Workflow: {workflow_name}</h2>
-    <p>Gerado em: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+    <p>Gerado em: 2025-11-23 11:52:17</p>
 
     <table>
         <tr>
@@ -37,47 +26,17 @@ def generate_html(report_path=".flamma/quarantine/flaky_tests.json", out_path="r
             <th>Porcentagem Falhas</th>
             <th>Status</th>
         </tr>
-"""
 
-    for test_name, info in data["tests"].items():
-        passes = info["pass_count"]
-        fails = info["fail_count"]
-        total = passes + fails
-        fail_rate = (fails / total) * 100 if total > 0 else 0
-        row_class = "flaky" if info["is_flaky"] else "stable"
+         html += f"""
+    <tr class="{row_class}">
+        <td>{test_name}</td>
+        <td>{passes}</td>
+        <td>{fails}</td>
+        <td>{info["runs"]}</td>
+        <td>{fail_rate:.1f}%</td>
+        <td>{"Flaky" if is_flaky else "Estável"}</td>
+    </tr>
 
-        html += f"""
-        <tr class="{row_class}">
-            <td>{test_name}</td>
-            <td>{passes}</td>
-            <td>{fails}</td>
-            <td>{info["runs"]}</td>
-            <td>{fail_rate:.1f}%</td>
-            <td>{"Flaky" if info["is_flaky"] else "Estável"}</td>
-        </tr>
-"""
-
-    html += """
     </table>
 </body>
 </html>
-"""
-
-    with open(out_path, "w") as f:
-        f.write(html)
-
-    print(f"Relatório gerado em: {out_path}")
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--report", default=".flamma/quarantine/flaky_tests.json")
-    parser.add_argument("--out", default="report.html")
-    parser.add_argument("--workflow", help="Nome do workflow ou commit")
-    args = parser.parse_args()
-
-    generate_html(args.report, args.out, args.workflow)
-
-
-if __name__ == "__main__":
-    main()
