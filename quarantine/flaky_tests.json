@@ -1,6 +1,0 @@
-{
-  "tests": [
-    "tests/test_flaky.py::test_flaky"
-  ],
-  "last_updated": "2025-11-22"
-}
