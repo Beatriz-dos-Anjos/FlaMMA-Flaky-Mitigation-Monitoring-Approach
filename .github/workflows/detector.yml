@@ -1,0 +1,66 @@
+name: Reusable Flaky Detection Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      reruns:
+        required: false
+        default: 3
+        type: number
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+jobs:
+  flaky-detection:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout TARGET repo (repo que está chamando)
+        uses: actions/checkout@v4
+
+      - name: Checkout FlaMMA tooling (seu repo)
+        uses: actions/checkout@v4
+        with:
+          repository: Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach
+          path: .flamma
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install -r .flamma/requirements.txt
+
+      - name: Generate quarantine filter
+        run: python .flamma/quarantine/quarantine.py generate-filter
+
+      - name: Run tests with filter
+        run: |
+          pytest -k "$(cat filter.txt)" --junitxml=ci_results.xml
+
+      - name: Run flaky detector
+        run: python .flamma/detector/detect_flaky.py --reruns ${{ inputs.reruns }}
+
+      - name: Update quarantine list
+        run: python .flamma/quarantine/quarantine.py update
+
+      - name: Create GitHub issues
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python .flamma/issues/create_github_issue.py --report flaky_report.json
+
+      - name: Generate HTML report
+        run: python .flamma/issues/generate_report.py
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: flamma-flaky-artifacts
+          path: |
+            flaky_report.json
+            .flamma/quarantine/flaky_tests.json
+            .flamma/issues/report.html
+            ci_results.xml

@@ -35,7 +35,7 @@ jobs:
 
       - name: Create GitHub issues
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python issues/create_github_issue.py --report flaky_report.json
 
