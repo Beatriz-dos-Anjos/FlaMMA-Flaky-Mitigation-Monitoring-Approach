@@ -1,0 +1,11 @@
+name: Test Flaky Pipeline Locally
+
+on:
+  push:
+    branches:
+      - chore/cd   # ou sua branch atual
+
+jobs:
+  run-flamma:
+    uses: Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach/.github/workflows/detector.yml@chore/cd
+    secrets: inherit
