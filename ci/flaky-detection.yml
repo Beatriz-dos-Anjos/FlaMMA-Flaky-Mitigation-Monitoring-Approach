@@ -1,0 +1,53 @@
+name: Flaky Detection Pipeline
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  flaky-detection:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate quarantine filter
+        run: python quarantine/quarantine.py generate-filter
+
+      - name: Run tests with filter
+        run: |
+          pytest -k "$(cat filter.txt)" --junitxml=ci_results.xml
+
+      - name: Run flaky detector
+        run: python detector/detect_flaky.py --reruns 3
+
+      - name: Update quarantine list
+        run: python quarantine/quarantine.py update
+
+      - name: Create GitHub issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python issues/create_github_issue.py --report flaky_report.json
+
+      - name: Generate HTML report
+        run: python issues/generate_report.py
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: flaky-detection-artifacts
+          path: |
+            flaky_report.json
+            quarantine/flaky_tests.json
+            issues/report.html
+            ci_results.xml

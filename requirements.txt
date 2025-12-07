@@ -1,0 +1,5 @@
+pytest
+requests
+jsonschema
+PyGithub
+pytest-random-order

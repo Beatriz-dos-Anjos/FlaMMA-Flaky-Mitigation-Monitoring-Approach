@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "tests": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "runs": { "type": "array", "items": { "type": "string" } },
+          "is_flaky": { "type": "boolean" },
+          "pass_count": { "type": "number" },
+          "fail_count": { "type": "number" }
+        },
+        "required": ["runs", "is_flaky", "pass_count", "fail_count"]
+      }
+    }
+  },
+  "required": ["tests"]
+}

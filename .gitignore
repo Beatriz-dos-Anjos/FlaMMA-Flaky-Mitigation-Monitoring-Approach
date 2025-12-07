@@ -1,0 +1,16 @@
+# Ignorar virtualenvs e artefatos comuns
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.egg-info/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.coverage
+dist/
+build/
+*.egg
+.DS_Store
