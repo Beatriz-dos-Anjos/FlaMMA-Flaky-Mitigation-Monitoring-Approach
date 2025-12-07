@@ -3,7 +3,12 @@ name: Test Flaky Pipeline Locally
 on:
   push:
     branches:
-      - chore/cd   # ou sua branch atual
+      - chore/cd
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
 
 jobs:
   run-flamma:
