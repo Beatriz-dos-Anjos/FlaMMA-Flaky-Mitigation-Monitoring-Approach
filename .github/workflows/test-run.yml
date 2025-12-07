@@ -3,7 +3,7 @@ name: Test Flaky Pipeline Locally
 on:
   push:
     branches:
-      - chore/cd
+      - develop
   workflow_dispatch:
 
 permissions:
