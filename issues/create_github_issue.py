@@ -2,13 +2,7 @@
 """
 issues/create_github_issue.py
 
-- Cria issues no GitHub a partir de um flaky_report.json.
-- Comportamento:
-  - evita duplicar issues (checa issues abertas com label "flaky")
-  - admite modo --dry-run (não cria nada, só imprime o que faria)
-  - tenta usar PyGithub; se não houver, cai para requests (fallback)
-  - opcional: embutir conteúdo HTML/mini-relatório na issue via --embed-html PATH
-  - compatível com execução local e com GitHub Actions
+Cria issues no GitHub a partir de um flaky_report.json.
 """
 
 import os
@@ -30,6 +24,81 @@ try:
 except Exception:
     _HAS_REQUESTS = False
 
+
+# ============================================================
+#  Função corrigida — AGORA ESTÁ FORA do main()
+# ============================================================
+def generate_html_report(data, out_path="issues/report.html"):
+    from datetime import datetime
+    import os
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Flaky Test Report</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; padding: 20px; }}
+        table {{ border-collapse: collapse; width: 100%; margin-top: 20px; }}
+        th, td {{ border: 1px solid #ccc; padding: 8px; text-align: left; }}
+        th {{ background: #eee; }}
+        .flaky {{ background: #ffb3b3; }}
+    </style>
+</head>
+<body>
+    <h1>Relatório de Testes Flaky</h1>
+    <p>Gerado em: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+
+    <table>
+        <tr>
+            <th>Teste</th>
+            <th>Passes</th>
+            <th>Fails</th>
+            <th>Runs</th>
+            <th>Porcentagem Falhas</th>
+            <th>Status</th>
+        </tr>
+"""
+
+    for test_name, info in data.get("tests", {}).items():
+        passes = info.get("pass_count", 0)
+        fails = info.get("fail_count", 0)
+        is_flaky = info.get("is_flaky", False)
+
+        if not is_flaky:
+            continue
+
+        total = passes + fails
+        fail_rate = (fails / total) * 100 if total > 0 else 0
+
+        html += f"""
+        <tr class="flaky">
+            <td>{test_name}</td>
+            <td>{passes}</td>
+            <td>{fails}</td>
+            <td>{info.get("runs", [])}</td>
+            <td>{fail_rate:.1f}%</td>
+            <td>Flaky</td>
+        </tr>
+"""
+
+    html += """
+    </table>
+</body>
+</html>
+"""
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    print(f"✅ Relatório HTML gerado em: {out_path}")
+
+
+# ============================================================
+# Funções auxiliares originais
+# ============================================================
 
 def diagnosticar_causa(runs):
     if "failed" in runs and "passed" in runs:
@@ -85,7 +154,6 @@ def build_issue_body(test_name, passes, fails, runs, embed_html_path=None):
         "```",
     ]
 
-    # embutir HTML opcionalmente
     if embed_html_path:
         try:
             with open(embed_html_path, "r", encoding="utf-8") as h:
@@ -101,9 +169,12 @@ def build_issue_body(test_name, passes, fails, runs, embed_html_path=None):
                 "```",
             ]
         except Exception as e:
-            body_lines += ["", f"_Não foi possível ler {embed_html_path}: {e}_"]
+            body_lines.append(f"_Não foi possível ler {embed_html_path}: {e}_")
 
-    body_lines += ["", "### Observação", "Este relatório foi gerado automaticamente pelo módulo de flakiness."]
+    body_lines.append("")
+    body_lines.append("### Observação")
+    body_lines.append("Este relatório foi gerado automaticamente pelo módulo de flakiness.")
+
     return "\n".join(body_lines)
 
 
@@ -133,6 +204,9 @@ def create_issue_pygithub(repo, title, body, labels, dry_run=False):
 
 
 def issue_exists_requests(repo_full_name, token, title):
+    if not _HAS_REQUESTS:
+        return False
+
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
     url = f"https://api.github.com/repos/{repo_full_name}/issues"
     params = {"state": "open", "labels": "flaky", "per_page": 100}
@@ -144,33 +218,31 @@ def issue_exists_requests(repo_full_name, token, title):
             if it.get("title", "").strip() == title.strip():
                 return True
     except Exception:
-        try:
-            resp = requests.get(url, headers=headers, params={"state": "open", "per_page": 100}, timeout=15)
-            resp.raise_for_status()
-            for it in resp.json():
-                if it.get("title", "").strip() == title.strip():
-                    return True
-        except Exception:
-            pass
+        pass
     return False
 
 
 def create_issue_requests(repo_full_name, token, title, body, labels, dry_run=False):
+    if not _HAS_REQUESTS:
+        raise RuntimeError("Biblioteca 'requests' não instalada.")
+
     if dry_run:
         print("[DRY RUN] Criaria issue (HTTP):", title)
         return None
 
     url = f"https://api.github.com/repos/{repo_full_name}/issues"
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
-    data = {"title": title, "body": body, "labels": labels}
-
-    resp = requests.post(url, headers=headers, json=data, timeout=15)
+    resp = requests.post(url, headers=headers, json={"title": title, "body": body, "labels": labels}, timeout=15)
 
     if resp.status_code in (200, 201):
         return resp.json().get("html_url")
-    else:
-        raise RuntimeError(f"Erro criando issue via REST API: {resp.status_code} {resp.text}")
 
+    raise RuntimeError(f"Erro criando issue via REST API: {resp.status_code} {resp.text}")
+
+
+# ============================================================
+# Main
+# ============================================================
 
 def main():
     parser = argparse.ArgumentParser(description="Criar issues automáticas a partir de flaky_report.json")
@@ -178,6 +250,7 @@ def main():
     parser.add_argument("--repository", help="Repo user/repo. Se omitido, usa GITHUB_REPOSITORY")
     parser.add_argument("--dry-run", action="store_true", help="Apenas simula")
     parser.add_argument("--embed-html", help="Embed de issues/report.html")
+    parser.add_argument("--generate-html", action="store_true", help="Gera issues/report.html automaticamente")
     args = parser.parse_args()
 
     repo_name = args.repository or os.getenv("GITHUB_REPOSITORY")
@@ -203,60 +276,52 @@ def main():
         print("Nenhum teste em 'tests'. Nada a fazer.")
         return
 
-    use_pygithub = _HAS_PYGITHUB
-    use_requests = _HAS_REQUESTS
+    if args.generate_html:
+        generate_html_report(data)
 
+    # PyGithub?
+    use_pygithub = _HAS_PYGITHUB
+    repo = None
     if use_pygithub:
-        gh = Github(token)
         try:
+            gh = Github(token)
             repo = gh.get_repo(repo_name)
         except Exception as e:
-            print(f"Erro PyGithub: {e}", file=sys.stderr)
-            repo = None
+            print(f"Erro PyGithub: {e}")
             use_pygithub = False
-    else:
-        repo = None
 
-    if not use_pygithub and not use_requests:
-        print("Instale: pip install PyGithub requests", file=sys.stderr)
-        sys.exit(1)
-
-    # PROCESSAR TESTES
+    # ------------------------------------------------------------
+    # PROCESSAR TESTES FLAKY
+    # ------------------------------------------------------------
     for test_name, info in tests.items():
         passes = info.get("pass_count", 0)
         fails = info.get("fail_count", 0)
         runs = info.get("runs", [])
 
-        # -------------------------------
-        #   ⛔ NOVA LÓGICA CORRETA:
-        #   SO-MEN-TE criar issue se flaky
-        # -------------------------------
         is_flaky = passes > 0 and fails > 0
         if not is_flaky:
             print(f"[INFO] Teste estável ignorado: {test_name}")
             continue
-        # -------------------------------
 
         title = f"Flaky test detected: {test_name}"
         body = build_issue_body(test_name, passes, fails, runs, embed_html_path=args.embed_html)
         labels = ["flaky", "ci-auto"]
 
-        # checar duplicidade
+        # Checar duplicidade
         exists = False
         try:
             if use_pygithub and repo:
                 exists = issue_exists_pygithub(repo, title)
-            elif use_requests:
+            else:
                 exists = issue_exists_requests(repo_name, token, title)
         except Exception as e:
-            print(f"Warning ao checar duplicata: {e}")
-            exists = False
+            print(f"WARNING ao checar duplicata: {e}")
 
         if exists:
             print(f"[INFO] Issue já existe: {title}")
             continue
 
-        # criar issue
+        # Criar issue
         try:
             if use_pygithub and repo:
                 url = create_issue_pygithub(repo, title, body, labels, dry_run=args.dry_run)
