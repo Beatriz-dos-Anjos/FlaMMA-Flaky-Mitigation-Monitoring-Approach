@@ -24,6 +24,7 @@ jobs:
         run: python quarantine/quarantine.py generate-filter
 
       - name: Run tests with filter
+        continue-on-error: true
         run: |
           pytest -k "$(cat filter.txt)" --junitxml=ci_results.xml
 
@@ -40,9 +41,10 @@ jobs:
           python issues/create_github_issue.py --report flaky_report.json
 
       - name: Generate HTML report
-        run: python issues/generate_report.py
+        run: python issues/generate_report.py --report flaky_report.json --out issues/report.html
 
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: flaky-detection-artifacts

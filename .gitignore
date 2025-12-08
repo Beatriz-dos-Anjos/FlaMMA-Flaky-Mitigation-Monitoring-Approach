@@ -14,3 +14,4 @@ dist/
 build/
 *.egg
 .DS_Store
+issues/report.html
