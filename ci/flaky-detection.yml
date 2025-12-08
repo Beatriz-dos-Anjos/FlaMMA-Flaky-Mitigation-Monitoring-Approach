@@ -31,6 +31,20 @@ jobs:
       - name: Run flaky detector
         run: python detector/detect_flaky.py --reruns 3
 
+      - name: 🔍 DEBUG - Verificar se flaky_report.json foi gerado
+        run: |
+          echo "=== Listando raiz do projeto ==="
+          ls -la
+          echo ""
+          if [ -f flaky_report.json ]; then
+            echo "✅ flaky_report.json EXISTE"
+            echo "Tamanho: $(du -h flaky_report.json)"
+            wc -l flaky_report.json
+          else
+            echo "❌ flaky_report.json NÃO EXISTE"
+            exit 1
+          fi
+
       - name: Update quarantine list
         run: python quarantine/quarantine.py update
 
@@ -40,10 +54,41 @@ jobs:
         run: |
           python issues/create_github_issue.py --report flaky_report.json
 
+      - name: 🔍 DEBUG - Verificar estrutura da pasta issues ANTES
+        run: |
+          echo "=== Conteúdo de issues/ ANTES ==="
+          ls -la issues/
+          echo ""
+          echo "=== Testando se o script Python existe ==="
+          if [ -f issues/generate_report.py ]; then
+            echo "✅ Script existe"
+            python issues/generate_report.py --help
+          else
+            echo "❌ Script NÃO existe"
+          fi
+
       - name: Generate HTML report
         run: |
-          mkdir -p issues
+          echo "➡️ Executando: python issues/generate_report.py --report flaky_report.json --out issues/report.html"
           python issues/generate_report.py --report flaky_report.json --out issues/report.html
+          echo "✅ Comando executado sem erro"
+
+      - name: 🔍 DEBUG - Verificar se report.html foi criado
+        run: |
+          echo "=== Conteúdo de issues/ DEPOIS ==="
+          ls -la issues/
+          echo ""
+          if [ -f issues/report.html ]; then
+            echo "✅ issues/report.html FOI CRIADO!"
+            echo "Tamanho: $(du -h issues/report.html)"
+            echo "Primeiras 50 linhas:"
+            head -50 issues/report.html
+          else
+            echo "❌ issues/report.html NÃO FOI CRIADO"
+            echo ""
+            echo "Procurando report.html em todo o projeto:"
+            find . -name "report.html" -type f
+          fi
 
       - name: Upload artifacts
         if: always()
