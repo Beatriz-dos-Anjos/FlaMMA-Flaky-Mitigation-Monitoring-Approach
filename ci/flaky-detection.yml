@@ -54,3 +54,12 @@ jobs:
             .flamma/quarantine/flaky_tests.json
             .flamma/issues/report.html
             ci_results.xml
+      - name: Debug - Verificar arquivos
+        run: |
+          echo "=== Conteúdo da raiz ==="
+          ls -la *.json *.xml 2>/dev/null || echo "Nenhum arquivo"
+          echo "=== Conteúdo de .flamma/issues/ ==="
+          ls -la .flamma/issues/
+          echo "=== Verificar se report.html foi gerado ==="
+          cat .flamma/issues/report.html | head -20 || echo "report.html não existe"
+
