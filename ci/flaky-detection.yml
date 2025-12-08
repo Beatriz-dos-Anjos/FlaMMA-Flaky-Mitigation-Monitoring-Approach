@@ -41,7 +41,8 @@ jobs:
           python issues/create_github_issue.py --report flaky_report.json
 
       - name: Generate HTML report
-        run: python .flamma/issues/generate_report.py --report flaky_report.json --out .flamma/issues/report.html
+        run: |
+          python .flamma/issues/generate_report.py --report flaky_report.json --out .flamma/issues/report.html
 
       - name: Upload artifacts
         if: always()
