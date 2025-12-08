@@ -42,7 +42,8 @@ jobs:
 
       - name: Generate HTML report
         run: |
-          python .flamma/issues/generate_report.py --report flaky_report.json --out .flamma/issues/report.html
+          mkdir -p issues
+          python issues/generate_report.py --report flaky_report.json --out issues/report.html
 
       - name: Upload artifacts
         if: always()
@@ -51,15 +52,6 @@ jobs:
           name: flaky-detection-artifacts
           path: |
             flaky_report.json
-            .flamma/quarantine/flaky_tests.json
-            .flamma/issues/report.html
+            quarantine/flaky_tests.json
+            issues/report.html
             ci_results.xml
-      - name: Debug - Verificar arquivos
-        run: |
-          echo "=== Conteúdo da raiz ==="
-          ls -la *.json *.xml 2>/dev/null || echo "Nenhum arquivo"
-          echo "=== Conteúdo de .flamma/issues/ ==="
-          ls -la .flamma/issues/
-          echo "=== Verificar se report.html foi gerado ==="
-          cat .flamma/issues/report.html | head -20 || echo "report.html não existe"
-
