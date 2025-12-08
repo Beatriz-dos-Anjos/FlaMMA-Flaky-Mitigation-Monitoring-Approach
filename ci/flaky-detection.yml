@@ -41,7 +41,7 @@ jobs:
           python issues/create_github_issue.py --report flaky_report.json
 
       - name: Generate HTML report
-        run: python issues/generate_report.py --report flaky_report.json --out issues/report.html
+        run: python .flamma/issues/generate_report.py --report flaky_report.json --out .flamma/issues/report.html
 
       - name: Upload artifacts
         if: always()
@@ -50,6 +50,6 @@ jobs:
           name: flaky-detection-artifacts
           path: |
             flaky_report.json
-            quarantine/flaky_tests.json
-            issues/report.html
+            .flamma/quarantine/flaky_tests.json
+            .flamma/issues/report.html
             ci_results.xml
