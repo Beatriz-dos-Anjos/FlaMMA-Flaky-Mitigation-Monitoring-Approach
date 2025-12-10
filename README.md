@@ -1,69 +1,128 @@
-Visão Geral
+# 🔍 Flaky Test Detector and Quarantine Management
 
-FlaMMA é uma abordagem automatizada para detecção, quarentena e monitoramento de testes flaky integrada a pipelines de CI/CD.
-O objetivo é manter pipelines estáveis sem esconder problemas — isolando testes instáveis, mas registrando e reportando tudo para que a equipe possa corrigir depois.
+![GitHub Actions Status](https://github.com/Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach/workflows/Flake%20Test%20Detector%20(External)/badge.svg)
+[![GitHub release](https://img.shields.io/github/v/release/Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach?include_prereleases)](https://github.com/Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach/releases)
 
-O projeto investiga:
+This project implements a solution for the automatic detection of **Flaky Tests** within a repository. It ensures that these tests are moved to a **quarantine list** to prevent them from compromising the Continuous Integration (CI) pipeline, and it generates corresponding **GitHub Issues** for tracking and remediation.
 
-* como detectar flaky tests automaticamente,
-* como colocar esses testes em quarentena sem quebrar o build,
-* como reportá-los de forma rastreável (issues, logs),
-*  qual é o impacto disso no tempo do pipeline e na estabilidade geral.
+The functionality is fully integrated with GitHub Actions, allowing other projects to easily adopt and utilize our workflow.
 
-Este repositório contém a implementação modular da abordagem.
+## 🚀 Key Features
 
-🎯 Objetivos do Projeto
+Our system automates the flaky test lifecycle through three main pillars:
 
--> Detectar automaticamente testes flaky por meio de reexecuções e análise de inconsistência.
-->Isolar temporariamente (quarentena) os testes encontrados.
-->Gerar issues automáticas com detalhes e logs dos testes instáveis.
-->Integrar todo o fluxo ao CI/CD (ex.: GitHub Actions).
+1.  **Automatic Detection:** The workflow is triggered on every `push` (or as configured), executing the tests and identifying flaky ones.
+2.  **Test Quarantine:** Identified flaky tests are automatically moved to a quarantine list, preventing them from randomly failing the CI build. **(See `quarantine.json` in artifacts)**
+3.  **Tracking via Issues:** A GitHub Issue is automatically created for every detected flaky test, enabling the team to track and prioritize its correction.
+4.  **Reporting (Artifact):** Generation of a detailed report in JSON format (the **Flake Reports** Artifact), containing information about the detected tests and the status of the generated Issues.
 
-Avaliar eficiência, overhead e estabilidade da solução proposta.
+## 🛠️ How to Use
 
-🧱 Estrutura do Projeto
-project/
- ├── ci/               # Configurações do pipeline (GitHub Actions)
- ├── detector/         # Lógica de detecção de flaky tests
- ├── quarantine/       # Módulo que gerencia testes em quarentena
- ├── issues/           # Geração de issues e relatórios automáticos
- ├── contracts/        # Schemas JSON para padronização dos módulos
- ├── tests/            # Testes usados para demonstração e validação
- │    ├── test_stable.py
- │    └── test_flaky.py
- ├── requirements.txt  # Dependências gerais do projeto
- └── README.md         # Este documento
+The project can be utilized in two primary ways, depending on whether you wish to use this repository as a base (Template) or just consume the workflow (External Integration).
 
+### Option 1: Using as a Template (Recommended for New Projects)
 
-Cada módulo é independente e segue contratos definidos por schemas JSON localizados em contracts/.
+If you are starting a new project and want it to include our complete CI structure, follow these steps:
 
-🧪 Testes de Demonstração
+1.  **Access the Repository:** Go to the main page of the repository.
+2.  **Create from Template:** Click the green **"Use this template"** button and create a new repository with your desired name.
+3.  **Done!** Your new repository inherits the entire file structure (`.github/workflows/`, dependencies, etc.). The workflow will be triggered automatically upon every commit.
 
-O repositório inclui dois testes básicos:
+### Option 2: Workflow Integration in an Existing Repository
 
-test_stable.py – sempre passa
+If you have an existing repository and only wish to leverage our flaky test detector without copying the complete structure of our project, you can directly reference our workflow via GitHub Actions.
 
-test_flaky.py – falha aleatoriamente (simula cenário real)
+**Prerequisite:** Your repository must have the tests configured in a compatible manner (e.g., using `pytest` and the specific test format we are using).
 
-Esses testes servem de base para os módulos de detecção e quarentena.
+#### 1. Create the Folder Structure
 
-📦 Instalação das Dependências
+In your external repository, create the following folders:
 
-Para instalar as bibliotecas necessárias:
+`.github/ └── workflows/`
 
-pip install -r requirements.txt
+#### 2. Create the YAML File
 
+Inside the `workflows/` folder, create a YAML file (e.g., `main.yml`). The file name can be anything, but the internal syntax must reference our workflow.
 
-Dependências incluídas:
+#### 3. Configure the Workflow YAML
 
-pytest — execução de testes
+In the YAML file you just created, configure the `workflow_dispatch` and reference our main workflow (`detector.yml`), **tracking the specific version (tag) you want to use**.
 
-requests — envio de issues via API
+Replace `https://github.com/Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach` with the correct path to our repository and use the desired release tag (e.g., `@v1`):
 
-jsonschema — validação dos contratos JSON
+```yaml
+name: Flake Test Detector (External)
 
-▶️ Executando os Testes
+on:
+  push:
+    branches:
+      - develop
 
-Após instalar as dependências, execute:
+jobs:
+  flake_detection:
+    uses: Beatriz-dos-Anjos/FlaMMA-Flaky-Mitigation-Monitoring-Approach/.github/workflows/detector.yml@v1
+    
+    # Add secrets or permissions as required by your project
+```
 
-pytest -q
+#### 4. Create a Release (Tag)
+
+⚠️ For external integration to work, our main repository must have a Release published. Ensure that the tag referenced in your YAML file (e.g., @v1) exists in our repository.
+
+## ⚙️ Workflow Structure
+
+The magic happens within our main workflow. Here are the key files:
+
+| File | Location | Description |
+| :--- | :--- | :--- |
+| `detector.yml` | `.github/workflows/` | **Main Workflow:** The entry point for flaky test detection. It is used for External Integration. It manages setup, test execution, quarantine, and Issue creation. |
+| `test-run.yml` | `.github/workflows/` | **Local Workflow:** Used to run the code locally, typically triggered on development branches to validate functionality before release. |
+| `detect_flaky.py` | `detector/` | The core Python script responsible for executing tests multiple times to identify flaky behavior. |
+| `create_github_issue.py` | `issues/` | Script that handles API communication with GitHub to create or update tracking issues based on detection results. |
+| `flaky_tests.json` | `quarantine/` | Persistent artifact that stores the list of quarantined tests, ensuring they do not block future CI runs. |
+
+## 📦 Generated Artifacts
+
+After the workflow runs, artifacts are generated and can be downloaded directly from GitHub Actions. These files are crucial for inspecting and managing flaky tests:
+
+- Flake Reports: Contains a JSON file with the list of all detected flaky tests and metadata about their execution (passed/failed).
+
+- Issues: Contains information about the created or updated GitHub Issues.
+
+- Quarantine: Contains the updated quarantine.json file that the system uses to skip unstable tests during normal CI execution.
+
+## 🛣️ Roadmap and Future Contributions
+
+FlaMMA is under continuous development. The following roadmap details the main areas of focus to expand and enhance the solution, aiming to maximize its impact in Continuous Integration (CI/CD) environments:
+
+### 1. Enhanced Monitoring and Traceability
+
+The goal is to transition current artifacts into active and intelligent monitoring tools.
+
+- Report Synchronization: Implement real-time synchronization of generated reports (artifacts) with the status of corresponding GitHub Issues. This will ensure the list of unstable tests and their status (open/in correction) is accurate and up-to-date.
+
+- Advanced Metrics: Integrate advanced metrics analysis to automate the calculation of the instability reduction rate and operational cost, providing a clear return on investment for using the tool.
+### 2. Intelligent Detection Expansion
+
+Moving beyond empirical re-execution detection to a more predictive approach.
+
+- Predictive Models: Explore the application of statistical models or Machine Learning to enhance flaky test detection. These models will analyze historical execution patterns and logs to identify flaky candidates with greater precision and reduced re-execution costs.
+
+- Multi-Language Support: Extend support for test frameworks and languages beyond Python (e.g., Java with JUnit, JavaScript with Jest), validating FlaMMA's modular architecture across different CI/CD ecosystems.
+### 3. Adoption Optimization
+
+Making FlaMMA's integration into existing projects as simple as possible.
+
+- Simplified External Integration: Finalize and simplify the external integration flow (non-template usage), ensuring that consuming the workflow via GitHub Actions (by referencing the main repository tag, e.g., @v1) is robust and easy to configure, reducing adoption barriers.
+
+## 📧 Contact
+
+For questions or specific inquiries, please contact the development team:
+
+ - Beatriz Mergulhao dos Anjos: bma3@cin.ufpe.br
+
+- Giovanna Clocate Cavalcante de Almeida: gcca@cin.ufpe.br
+
+- Luiza Trigueiro do Rêgo Barros: ltrb@cin.ufpe.br
+
+- Rodrigo Dias Gusmao Sales: rdgs@cin.ufpe.br
